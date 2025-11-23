@@ -1,0 +1,28 @@
+target/
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.vscode
+
+# Env files
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+
+# Downloads and temp artifacts
+downloads/
+tmp/
+*.tmp
+
+# Maven wrapper (if not used)
+mvnw
+mvnw.cmd
+.mvn/
