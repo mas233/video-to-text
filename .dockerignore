@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+python/.venv/
+*.egg-info/
+dist/
+build/
+
+# 模型缓存（不打包进镜像，运行时挂载）
+models/
+*.pth
+*.bin
+*.safetensors
+
+# 数据文件
+data/
+output/
+*.mp3
+*.mp4
+*.wav
+*.avi
+*.mov
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# macOS
+.DS_Store
+
+# 文档
+README.md
+DOCKER_USAGE.md
+LICENSE
+
+# Docker
+docker-compose.yml
+Dockerfile

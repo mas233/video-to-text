@@ -1,0 +1,16 @@
+# MCP 服务器配置
+{
+  "mcpServers": {
+    "video-processing": {
+      "command": "python",
+      "args": [
+        "-m",
+        "mcp.server"
+      ],
+      "cwd": "/Users/mas233/code/video-summary",
+      "env": {
+        "PYTHONPATH": "/Users/mas233/code/video-summary"
+      }
+    }
+  }
+}
