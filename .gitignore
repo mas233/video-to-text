@@ -26,3 +26,34 @@ tmp/
 mvnw
 mvnw.cmd
 .mvn/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+python/.venv/
+*.egg-info/
+dist/
+build/
+.venv
+
+# AI Models (大模型文件，不提交到 Git)
+models/
+*.pth
+*.bin
+*.safetensors
+*.gguf
+*.msgpack
+
+# 数据文件
+data/
+output/
+*.mp3
+*.mp4
+*.wav
+*.avi
+*.mov
+*.flac
+*.ogg

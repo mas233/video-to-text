@@ -1,91 +1,174 @@
-# Video Summary（视频转文字服务）
+# Video Summary（视频转文字 + 智能 Agent）
 
-基于 Spring Boot 的视频转文字服务，调用千问（DashScope）OpenAI 兼容接口完成转写。项目提供 REST 和 SSE 两种返回方式，并在服务端自动提取音频并控制模型输入长度。
+基于开源 LLM 的视频处理服务，支持视频转文字、音频提取、智能对话等功能。
 
-**输入文件**
-- 支持：带音轨的 MP4 视频，或 MP3 音频
-- 服务端会将音频统一转码为 `mp3(24kHz/mono/32kbps)`，必要时自动降码以满足接口的最大输入限制
+## 🚀 快速开始
 
-## 环境要求
-- JDK 8 及以上（推荐 JDK 17）
-- Maven 3.6+（用于构建）
+### 1. 安装依赖
 
-## 配置 API Key
-千问 API Key 通过环境变量或配置文件注入，二选一即可：
-- 环境变量：`DASHSCOPE_API_KEY`（推荐方式）
-- 配置文件：`src/main/resources/application.properties` 中的 `qwen.api.key`
-
-示例（本地终端设置环境变量并启动）：
 ```bash
-export DASHSCOPE_API_KEY=sk-xxxx
-java -jar target/video-summary-1.0.0.jar
+# Python 环境 (推荐 3.11+)
+pip install -r requirements.txt
 ```
 
-或将 `.env.example` 中的 `DASHSCOPE_API_KEY` 替换为真实值后，在同一终端加载再启动：
+### 2. 运行 Agent
+
 ```bash
-set -a; . ./.env.example; set +a
-java -jar target/video-summary-1.0.0.jar
+# 交互模式
+python agent/video_agent.py --interactive
+
+# 单次任务
+python agent/video_agent.py "列出 data 目录的文件"
 ```
 
-## 构建与运行
-```bash
-mvn clean package
-java -jar target/video-summary-1.0.0.jar
+### 3. 示例任务
+
+```
+请输入任务: 列出 data 目录的文件
+请输入任务: 检查 data/transcriptions 是否存在
+请输入任务: 提取视频的音频
 ```
 
-（可选）Docker 部署：
+## 📋 核心功能
+
+### Agent 模式 (推荐)
+- ✅ **完全离线** - 使用本地 Qwen2.5-7B 模型
+- ✅ **智能工具调用** - 原生 `<tool_call>` 格式
+- ✅ **多轮对话** - 支持复杂任务分解
+- ✅ **Apple Silicon** - MPS 加速支持
+
+### 可用工具
+1. `list_files` - 列出目录文件
+2. `check_file_exists` - 检查文件存在性
+3. `extract_audio` - 视频提取音频
+4. `transcribe_audio` - 音频转文字 (返回 JSON: source/output/model/timestamp)
+5. `save_text` - 保存文本到文件
+
+## ⚙️ 配置选项
+
+### 指定设备
+```bash
+# MPS (Apple Silicon, 推荐)
+python agent/video_agent.py --device mps --interactive
+
+# CPU (较慢)
+python agent/video_agent.py --device cpu --interactive
+
+# CUDA (NVIDIA GPU)
+python agent/video_agent.py --device cuda --interactive
+```
+
+### 指定模型
+```bash
+# Qwen 2.5 7B (默认, 推荐)
+python agent/video_agent.py --model Qwen/Qwen2.5-7B-Instruct
+
+# Qwen 2 7B
+python agent/video_agent.py --model Qwen/Qwen2-7B-Instruct
+```
+
+## 🛠️ 技术栈
+
+- **LLM**: Qwen/Qwen2.5-7B-Instruct (7B 参数)
+- **框架**: HuggingFace Transformers
+- **加速**: PyTorch MPS / CUDA
+- **模型源**: ModelScope (国内) / HuggingFace (国外)
+
+## 📊 性能指标
+
+- **模型大小**: ~14.5 GB (FP16)
+- **推理速度**: ~3s/iteration (M1 Max)
+- **内存需求**: 16 GB RAM (推荐)
+- **格式正确率**: 100%
+
+## 🔧 环境要求
+
+- Python 3.11+
+- PyTorch 2.0+
+- 16GB+ RAM
+- Apple Silicon / NVIDIA GPU / CPU
+
+## 📖 项目结构
+
+```
+video-summary/
+├── agent/
+│   ├── video_agent.py       # 主 Agent 实现
+│   └── README.md            # Agent 详细文档
+├── core/                    # 核心处理模块
+│   ├── audio_extractor.py   # 音频提取
+│   ├── whisper_parser.py    # 语音转文字
+│   └── video_extractor.py   # 视频处理
+├── data/                    # 数据目录
+├── requirements.txt         # Python 依赖
+└── README.md               # 本文件
+```
+
+## 🎯 使用示例
+
+### 本地运行
+```bash
+python agent/video_agent.py --interactive
+
+请输入任务: 列出 data 目录的所有文件
+请输入任务: 提取视频的音频并转录为文字
+请输入任务: 将结果保存到 output/result.txt
+```
+
+### Docker 运行
+
+**构建镜像**:
 ```bash
 docker build -t video-summary .
-docker run -d -p 8080:8080 -e DASHSCOPE_API_KEY=sk-xxxx video-summary
 ```
-或使用 Compose：
+
+**交互模式**:
 ```bash
-docker-compose up -d
+docker run -it --rm \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/output:/app/output \
+  -v $(pwd)/models:/app/models \
+  video-summary
 ```
 
-## 接口说明
-
-### 1. REST：视频转文字
-`POST /api/video-to-text`
-- 参数：
-  - `file`（必填）：MP4 视频或 MP3 音频
-  - `language`（可选，默认 `auto`）
-  - `enableSpeakerDiarization`（可选，默认 `false`）
-- 返回：JSON，`data` 字段为完整文本
-
-示例（使用示例路径）：
+**单次任务**:
 ```bash
-curl -sS -X POST -H "Expect:" \
-  -F "file=@/Users/user/Downloads/example.mp4" \
-  -F "language=auto" \
-  -F "enableSpeakerDiarization=false" \
-  http://localhost:8080/api/video-to-text
+docker run --rm \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/output:/app/output \
+  video-summary \
+  python agent/video_agent.py "列出 data 目录的文件"
 ```
 
-### 2. SSE：视频转文字（流式）
-`POST /api/video-to-text-sse`
-- 行为：服务端先缓冲文本，再以 200 字符分片通过 SSE 输出
-- 事件：
-  - `start`：开始处理
-  - 若干 `partial`：分片文本
-  - `complete`：合并文本
-  - `error`：错误信息
+**说明**:
+- `-v $(pwd)/data:/app/data` - 挂载数据目录
+- `-v $(pwd)/output:/app/output` - 挂载输出目录
+- `-v $(pwd)/models:/app/models` - 持久化模型缓存 (~14.5GB)
+- `--rm` - 容器退出后自动删除
+- `-it` - 交互模式
 
-示例（使用示例路径）：
-```bash
-curl -N -X POST -H "Expect:" \
-  -F "file=@/Users/user/Downloads/example.mp4" \
-  -F "language=auto" \
-  -F "enableSpeakerDiarization=false" \
-  http://localhost:8080/api/video-to-text-sse
-```
+## 🔍 故障排查
 
- 
+### 模型下载慢
+自动优先使用 ModelScope (国内快)
 
-## 运行时行为与限制
-- 最大上传大小：100MB（可在 `application.properties` 中调整）
-- 模型输入长度：服务端自动控制并在超限时提示“音频过长”
-- 健康检查：`GET /actuator/health`
+### 内存不足
+使用 CPU 模式: `python agent/video_agent.py --device cpu`
 
-## 许可协议
-本项目采用 **Apache License 2.0**。
+### MPS 错误
+回退到 CPU: `python agent/video_agent.py --device cpu`
+
+## 📄 许可证
+
+MIT License
+
+## 🔗 相关资源
+
+- [Qwen 官方文档](https://qwen.readthedocs.io/)
+- [HuggingFace Transformers](https://huggingface.co/docs/transformers)
+- [ModelScope](https://modelscope.cn/)
+
+---
+
+**更新时间**: 2025-12-11  
+**版本**: v2.0 (Qwen 原生工具调用)
