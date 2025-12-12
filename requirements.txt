@@ -32,3 +32,4 @@ mcp>=0.9.0
 # 可选: 视觉语言模型（需要时安装）
 # llava-next>=0.1.0
 # qwen-vl>=0.1.0
+librosa

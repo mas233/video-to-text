@@ -13,7 +13,7 @@ import re
 from datetime import datetime
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 from pathlib import Path
-from typing import Union, Optional, List, Dict
+from typing import Union, Optional, List, Dict, Any
 
 # 设置本地模型缓存目录（支持离线使用）
 # 优先使用环境变量，否则使用当前目录下的 models 文件夹
@@ -25,8 +25,17 @@ _model = None
 _processor = None
 _pipe = None
 
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
-torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+# 智能设备选择：CUDA > MPS (Apple Silicon) > CPU
+def get_optimal_device():
+    """获取最优推理设备"""
+    if torch.cuda.is_available():
+        return "cuda:0", torch.float16
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return "mps", torch.float16
+    else:
+        return "cpu", torch.float32
+
+device, torch_dtype = get_optimal_device()
 model_id = "openai/whisper-large-v3-turbo"
 
 
@@ -179,13 +188,10 @@ def merge_word_chunks_to_sentences(chunks: List[Dict], max_sentences: int = 2, m
     return merged_chunks
 
 
-def load_model(verbose: bool = True):
+def load_model():
     """
     加载 Whisper 模型（延迟加载）
     优先从 ModelScope 下载（国内快），失败则使用 HuggingFace
-    
-    Args:
-        verbose: 是否显示加载信息
     """
     global _model, _processor, _pipe
     
@@ -198,30 +204,17 @@ def load_model(verbose: bool = True):
     os.environ['TRANSFORMERS_CACHE'] = cache_dir_abs
     os.environ['MODELSCOPE_CACHE'] = cache_dir_abs
     
-    if verbose:
-        print(f"设备: {device}")
-        print(f"模型缓存目录: {CACHE_DIR}")
-        print(f"正在加载模型 {model_id}...")
-    
     model_loaded = False
     
-    # 方案 1: 尝试从 ModelScope 加载（国内快）
+    # 方案 1: 尝试从 ModelScope 加载
     try:
-        if verbose:
-            print("尝试从 ModelScope 下载...")
-        
         from modelscope import snapshot_download
-        
-        # ModelScope 上的 Whisper 模型
         ms_model_id = "openai-mirror/whisper-large-v3-turbo"
         
         model_dir = snapshot_download(
             ms_model_id,
             cache_dir=cache_dir_abs
         )
-        
-        if verbose:
-            print(f"ModelScope 下载完成: {model_dir}")
         
         _model = AutoModelForSpeechSeq2Seq.from_pretrained(
             model_dir,
@@ -230,21 +223,13 @@ def load_model(verbose: bool = True):
             use_safetensors=True
         )
         _model.to(device)
-        
         _processor = AutoProcessor.from_pretrained(model_dir)
-        
-        if verbose:
-            print("✓ 从 ModelScope 加载成功")
-        
         model_loaded = True
         
     except ImportError:
-        if verbose:
-            print("modelscope 库未安装，跳过 ModelScope")
-    except Exception as e:
-        if verbose:
-            print(f"ModelScope 加载失败: {e}")
-            print("尝试从 HuggingFace 下载...")
+        pass
+    except Exception:
+        pass
     
     # 方案 2: 如果 ModelScope 失败，从 HuggingFace 加载
     if not model_loaded:
@@ -261,9 +246,6 @@ def load_model(verbose: bool = True):
             model_id,
             cache_dir=cache_dir_abs
         )
-        
-        if verbose:
-            print("✓ 从 HuggingFace 加载成功")
     
     # 创建 pipeline
     _pipe = pipeline(
@@ -274,9 +256,6 @@ def load_model(verbose: bool = True):
         torch_dtype=torch_dtype,
         device=device,
     )
-    
-    if verbose:
-        print("✓ 模型加载完成！\n")
 
 
 def transcribe_audio(
@@ -284,9 +263,8 @@ def transcribe_audio(
     language: str = "zh",
     output_dir: Optional[Union[str, Path]] = None,
     save_txt: bool = True,
-    save_json: bool = True,
-    verbose: bool = True
-) -> dict:
+    save_json: bool = True
+) -> Dict[str, Any]:
     """
     转录音频文件并保存结果
     
@@ -296,7 +274,6 @@ def transcribe_audio(
         output_dir: 输出目录，默认为 data/transcriptions/
         save_txt: 是否保存为文本文件
         save_json: 是否保存为 JSON 文件（包含元数据）
-        verbose: 是否显示详细信息
     
     Returns:
         包含转录文本和元数据的字典，格式:
@@ -313,38 +290,30 @@ def transcribe_audio(
         }
     """
     # 确保模型已加载
-    load_model(verbose=verbose)
+    load_model()
     
     audio_path = Path(audio_path).resolve()
-    
     if not audio_path.exists():
         raise FileNotFoundError(f"音频文件不存在: {audio_path}")
     
-    if verbose:
-        print(f"正在转录音频: {audio_path.name}")
-        print(f"语言: {language}")
-    
-    # 转录音频（启用词级别时间戳，然后合并为句子）
+    # 执行转录
     result = _pipe(
         str(audio_path),
         generate_kwargs={
             "language": language,
-            "task": "transcribe",  # 转录模式（带标点）
+            "task": "transcribe",
         },
-        return_timestamps="word",  # 返回词级别时间戳（更细粒度）
-        chunk_length_s=30,         # 30秒音频分块处理
+        return_timestamps="word",
+        chunk_length_s=30,
     )
     
-    # 将词级别的分段合并为句子级别（每段最多 2 个句子，最多 80 字符）
+    # 将词级别的分段合并为句子级别
     raw_chunks = result.get("chunks", [])
     sentence_chunks = merge_word_chunks_to_sentences(
         raw_chunks, 
         max_sentences=2,  # 最多2个句子
-        max_chars=80      # 或最多80个字符
+        max_chars=80
     )
-    
-    if verbose:
-        print(f"分段数: {len(sentence_chunks)} ({len(raw_chunks)} → {len(sentence_chunks)})")
     
     # 构建结果字典
     transcription_result = {
@@ -385,12 +354,12 @@ def transcribe_audio(
             f.write(f"{'='*60}\n")
             f.write(f"{result['text']}\n\n")
             
-            # 如果有分段时间戳，输出带时间戳的文本
-            if result.get("chunks"):
+            # 输出优化后的分段文本（句子级别，带时间戳）
+            if sentence_chunks:
                 f.write(f"{'='*60}\n")
                 f.write(f"分段文本（带时间戳）:\n")
                 f.write(f"{'='*60}\n")
-                for chunk in result["chunks"]:
+                for chunk in sentence_chunks:
                     timestamp = chunk.get("timestamp", (None, None))
                     text = chunk.get("text", "")
                     
@@ -402,9 +371,6 @@ def transcribe_audio(
                         f.write(f"{text}\n")
         
         transcription_result["output_files"]["txt"] = str(txt_path)
-        
-        if verbose:
-            print(f"✓ 文本已保存: {txt_path}")
     
     # 保存为 JSON 文件（包含完整的时间戳信息）
     if save_json:
@@ -413,14 +379,6 @@ def transcribe_audio(
             json.dump(transcription_result, f, ensure_ascii=False, indent=2)
         
         transcription_result["output_files"]["json"] = str(json_path)
-        
-        if verbose:
-            print(f"✓ JSON 已保存: {json_path}")
-    
-    if verbose:
-        print(f"\n转录完成! 文本长度: {len(result['text'])} 字符")
-        if result.get("chunks"):
-            print(f"分段数: {len(result['chunks'])}")
     
     return transcription_result
 

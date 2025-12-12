@@ -76,7 +76,7 @@ class AudioExtractor:
         sample_rate: int = 44100,
         channels: int = 2,
         overwrite: bool = True,
-        verbose: bool = True
+        verbose: bool = False
     ) -> str:
         """
         从视频中提取音频

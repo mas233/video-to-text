@@ -20,7 +20,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "core"))
 
 from audio_extractor import extract_audio_from_video
 from whisper_parser import transcribe_audio
-from video_extractor import VideoToTextConverter
 from file_writer import save_text_file, save_json_file
 
 
@@ -45,9 +44,6 @@ class VideoProcessingAgent:
             temperature: 生成温度
             max_iterations: 最大迭代次数
         """
-        print(f"正在初始化 Agent...")
-        print(f"模型: {model_name}")
-        
         # 检测设备
         if device is None:
             if torch.cuda.is_available():
@@ -61,9 +57,6 @@ class VideoProcessingAgent:
         self.temperature = temperature
         self.max_iterations = max_iterations
         
-        print(f"设备: {device}")
-        print(f"缓存目录: {cache_dir}")
-        
         # 加载模型
         self.tokenizer, self.model = self._load_model(model_name, cache_dir)
         
@@ -72,15 +65,10 @@ class VideoProcessingAgent:
         
         # 对话历史
         self.conversation_history = []
-        
-        print("✓ Agent 初始化完成!\n")
     
     def _load_model(self, model_name: str, cache_dir: str):
         """加载模型和分词器"""
-        print("\n加载模型...")
-        
         # 设置缓存目录环境变量
-        # 确保 ModelScope 和 HuggingFace 都使用项目的 models 目录
         cache_dir_abs = str(Path(cache_dir).resolve())
         os.environ['MODELSCOPE_CACHE'] = cache_dir_abs
         os.environ['HF_HOME'] = cache_dir_abs
@@ -90,20 +78,13 @@ class VideoProcessingAgent:
         model_path = None
         try:
             from modelscope import snapshot_download
-            print("尝试从 ModelScope 加载...")
-            
-            # 转换模型名称: Qwen/Qwen2.5-7B-Instruct -> qwen/qwen2.5-7b-instruct
             ms_model_name = model_name.lower().replace("qwen/qwen", "qwen/qwen")
             
             model_path = snapshot_download(
                 ms_model_name,
                 cache_dir=cache_dir_abs
             )
-            print(f"✓ 从 ModelScope 加载: {model_path}")
-            
-        except Exception as e:
-            print(f"ModelScope 加载失败: {e}")
-            print("尝试从 HuggingFace 加载...")
+        except Exception:
             model_path = model_name
         
         # 加载分词器
@@ -127,8 +108,6 @@ class VideoProcessingAgent:
         # 手动移动到设备 (MPS/CPU)
         if self.device in ["mps", "cpu"]:
             model = model.to(self.device)
-        
-        print(f"✓ 模型加载完成 (dtype={dtype}, device={self.device})")
         
         return tokenizer, model
     
@@ -289,7 +268,7 @@ class VideoProcessingAgent:
                 content = arguments["content"]
                 output_path = arguments["output_path"]
                 
-                result = save_text_file(content, output_path, verbose=False)
+                result = save_text_file(content, output_path)
                 if result["success"]:
                     return f"文件已保存: {result['file_path']} ({result['size_bytes']} bytes)"
                 else:

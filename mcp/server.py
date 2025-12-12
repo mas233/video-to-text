@@ -18,7 +18,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "core"))
 
 from audio_extractor import extract_audio_from_video
 from whisper_parser import transcribe_audio
-from video_extractor import VideoToTextConverter
 
 
 # 创建 MCP 服务器
@@ -139,8 +138,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 video_path=video_path,
                 output_path=output_path,
                 audio_format=audio_format,
-                bitrate=bitrate,
-                verbose=True
+                bitrate=bitrate
             )
             
             return [TextContent(
@@ -175,8 +173,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 language=language,
                 output_dir=output_dir,
                 save_txt=True,
-                save_json=True,
-                verbose=True
+                save_json=True
             )
             
             return [TextContent(
@@ -209,28 +206,36 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                     }, ensure_ascii=False, indent=2)
                 )]
             
-            # 创建转换器并执行
-            converter = VideoToTextConverter(
-                output_dir=output_dir,
-                keep_audio=keep_audio,
-                verbose=True
+            # 1. 提取音频
+            audio_path = extract_audio_from_video(
+                video_path=video_path,
+                audio_format="mp3"
             )
             
-            result = converter.convert(
-                video_path=video_path,
-                language=language
+            # 2. 转录音频
+            result = transcribe_audio(
+                audio_path=audio_path,
+                language=language,
+                output_dir=output_dir,
+                save_txt=True,
+                save_json=True
             )
+            
+            # 3. 清理音频文件（如果不保留）
+            if not keep_audio:
+                import os
+                if os.path.exists(audio_path):
+                    os.remove(audio_path)
             
             return [TextContent(
                 type="text",
                 text=json.dumps({
                     "success": True,
-                    "transcription": result["transcription"],
-                    "video_file": result["video_file"],
+                    "transcription": result["text"],
+                    "video_file": video_path,
                     "language": result["language"],
-                    "processing_time_seconds": result["processing_time_seconds"],
-                    "output_files": result["output_files"],
-                    "output_dir": result["output_dir"],
+                    "output_files": result.get("output_files", {}),
+                    "audio_kept": keep_audio,
                     "message": "视频转文字成功"
                 }, ensure_ascii=False, indent=2)
             )]
