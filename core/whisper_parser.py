@@ -29,14 +29,19 @@ _pipe = None
 def get_optimal_device():
     """获取最优推理设备"""
     if torch.cuda.is_available():
-        return "cuda:0", torch.float16
-    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        try:
+            props = torch.cuda.get_device_properties(0)
+            arch = f"sm_{props.major}{props.minor}"
+            if arch in torch.cuda.get_arch_list():
+                return "cuda:0", torch.float16
+        except Exception:
+            pass
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
         return "mps", torch.float16
-    else:
-        return "cpu", torch.float32
+    return "cpu", torch.float32
 
 device, torch_dtype = get_optimal_device()
-model_id = "openai/whisper-large-v3-turbo"
+model_id = "openai/whisper-large-v3"
 
 
 def split_long_chunk_by_sentences(text: str, timestamp: list, max_chars: int = 80) -> List[Dict]:
@@ -209,7 +214,7 @@ def load_model():
     # 方案 1: 尝试从 ModelScope 加载
     try:
         from modelscope import snapshot_download
-        ms_model_id = "openai-mirror/whisper-large-v3-turbo"
+        ms_model_id = "openai-mirror/whisper-large-v3"
         
         model_dir = snapshot_download(
             ms_model_id,
@@ -253,7 +258,7 @@ def load_model():
         model=_model,
         tokenizer=_processor.tokenizer,
         feature_extractor=_processor.feature_extractor,
-        torch_dtype=torch_dtype,
+        dtype=torch_dtype,
         device=device,
     )
 
@@ -302,6 +307,9 @@ def transcribe_audio(
         generate_kwargs={
             "language": language,
             "task": "transcribe",
+            "condition_on_prev_text": True,
+            "do_sample": False,
+            "num_beams": 4,
         },
         return_timestamps="word",
         chunk_length_s=30,
