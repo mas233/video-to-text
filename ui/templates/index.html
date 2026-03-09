@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Video Summary 控制台</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1>Video Summary 控制台</h1>
+      <p>视频上传、模型检测、环境检查、实时转录日志与产物下载</p>
+    </header>
+
+    <section class="card checks">
+      <div class="section-title-row">
+        <h2>系统检查</h2>
+      </div>
+      <div class="check-actions">
+        <button id="btnCheckModel" class="btn btn-primary">模型检测</button>
+        <button id="btnCheckEnv" class="btn btn-primary btn-soft">环境检查</button>
+      </div>
+      <div class="check-panels">
+        <div class="panel">
+          <h3>模型检测结果</h3>
+          <ul id="modelCheckList" class="status-list"></ul>
+          <pre id="modelCheckLog" class="mono">尚未执行</pre>
+        </div>
+        <div class="panel">
+          <h3>环境检查结果</h3>
+          <ul id="envCheckList" class="status-list"></ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="card upload-area">
+      <div class="section-title-row">
+        <h2>主功能入口：视频文本提取</h2>
+      </div>
+      <div id="dropZone" class="drop-zone">
+        <input id="fileInput" type="file" accept="video/*" hidden />
+        <p class="drop-main">点击选择或拖拽上传视频文件</p>
+        <p class="drop-sub">支持 2GB 以下，常见视频格式（mp4/mkv/mov/avi...）</p>
+        <button id="btnPickFile" class="btn btn-secondary">选择文件</button>
+      </div>
+      <div id="uploadInfo" class="upload-info">尚未上传文件</div>
+    </section>
+
+    <section class="card actions">
+      <div class="section-title-row">
+        <h2>转录配置</h2>
+      </div>
+      <div class="action-row">
+        <label>
+          转录语言
+          <input id="langInput" type="text" value="zh" maxlength="8" />
+        </label>
+        <button id="btnStart" class="btn btn-primary" disabled>开始执行</button>
+      </div>
+      <div id="downloadArea" class="download-area hidden">
+        <a id="fullTxtDownload" class="btn btn-ghost" href="#" target="_blank">下载完整文本 TXT</a>
+        <a id="segmentsTxtDownload" class="btn btn-ghost" href="#" target="_blank">下载时间戳分段 TXT</a>
+        <a id="jsonDownload" class="btn btn-ghost" href="#" target="_blank">下载 JSON</a>
+      </div>
+    </section>
+
+
+    <section class="card logs">
+      <div class="section-title-row">
+        <h2>运行日志</h2>
+      </div>
+      <div class="action-row log-actions">
+        <button id="btnClearLog" class="btn btn-secondary">清除当前日志</button>
+      </div>
+      <div class="progress-panel">
+        <div class="progress-head">
+          <div id="progressText" class="progress-text">等待开始</div>
+          <div id="progressPercent" class="progress-percent">0.00%</div>
+        </div>
+        <div class="progress-track">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+        <div id="stepList" class="step-list"></div>
+      </div>
+      <pre id="logBox" class="log-box"></pre>
+    </section>
+
+    <section class="card temp-files">
+      <div class="section-title-row">
+        <h2>临时文件</h2>
+      </div>
+      <div class="action-row">
+        <button id="btnRefreshTemp" class="btn btn-secondary">刷新大小</button>
+        <button id="btnClearTemp" class="btn btn-secondary">清除临时文件</button>
+      </div>
+      <div id="tempSummary" class="upload-info">尚未统计</div>
+      <ul id="tempList" class="status-list"></ul>
+    </section>
+
+  </div>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

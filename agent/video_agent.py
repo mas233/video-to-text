@@ -20,7 +20,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "core"))
 
 from audio_extractor import extract_audio_from_video
 from whisper_parser import transcribe_audio
-from video_extractor import VideoToTextConverter
 from file_writer import save_text_file, save_json_file
 
 
@@ -29,10 +28,10 @@ class VideoProcessingAgent:
     
     def __init__(
         self,
-        model_name: str = "Qwen/Qwen2.5-7B-Instruct",
+        model_name: str = "qwen/Qwen3.5-9B",
         cache_dir: str = "./models",
         device: Optional[str] = None,
-        temperature: float = 0.7,
+        temperature: float = 0.3,
         max_iterations: int = 10
     ):
         """
@@ -45,9 +44,6 @@ class VideoProcessingAgent:
             temperature: 生成温度
             max_iterations: 最大迭代次数
         """
-        print(f"正在初始化 Agent...")
-        print(f"模型: {model_name}")
-        
         # 检测设备
         if device is None:
             if torch.cuda.is_available():
@@ -61,9 +57,6 @@ class VideoProcessingAgent:
         self.temperature = temperature
         self.max_iterations = max_iterations
         
-        print(f"设备: {device}")
-        print(f"缓存目录: {cache_dir}")
-        
         # 加载模型
         self.tokenizer, self.model = self._load_model(model_name, cache_dir)
         
@@ -72,15 +65,10 @@ class VideoProcessingAgent:
         
         # 对话历史
         self.conversation_history = []
-        
-        print("✓ Agent 初始化完成!\n")
     
     def _load_model(self, model_name: str, cache_dir: str):
         """加载模型和分词器"""
-        print("\n加载模型...")
-        
         # 设置缓存目录环境变量
-        # 确保 ModelScope 和 HuggingFace 都使用项目的 models 目录
         cache_dir_abs = str(Path(cache_dir).resolve())
         os.environ['MODELSCOPE_CACHE'] = cache_dir_abs
         os.environ['HF_HOME'] = cache_dir_abs
@@ -90,20 +78,13 @@ class VideoProcessingAgent:
         model_path = None
         try:
             from modelscope import snapshot_download
-            print("尝试从 ModelScope 加载...")
-            
-            # 转换模型名称: Qwen/Qwen2.5-7B-Instruct -> qwen/qwen2.5-7b-instruct
             ms_model_name = model_name.lower().replace("qwen/qwen", "qwen/qwen")
             
             model_path = snapshot_download(
                 ms_model_name,
                 cache_dir=cache_dir_abs
             )
-            print(f"✓ 从 ModelScope 加载: {model_path}")
-            
-        except Exception as e:
-            print(f"ModelScope 加载失败: {e}")
-            print("尝试从 HuggingFace 加载...")
+        except Exception:
             model_path = model_name
         
         # 加载分词器
@@ -127,8 +108,6 @@ class VideoProcessingAgent:
         # 手动移动到设备 (MPS/CPU)
         if self.device in ["mps", "cpu"]:
             model = model.to(self.device)
-        
-        print(f"✓ 模型加载完成 (dtype={dtype}, device={self.device})")
         
         return tokenizer, model
     
@@ -234,6 +213,37 @@ class VideoProcessingAgent:
             }
         ]
     
+    @staticmethod
+    def _build_system_prompt() -> str:
+        """构建系统提示词，强制模型优先使用工具完成任务"""
+        return (
+            "你是一个专业的视频处理助手，负责帮助用户处理视频文件、提取音频和转录文字。\n\n"
+            "## 核心行为规则\n"
+            "1. 当用户给出明确可执行的任务时，**必须立即调用相应工具**，不得反问用户。\n"
+            "2. 禁止询问视频文本是否静态/动态、保存格式等细节——直接按默认参数执行。\n"
+            "3. 工具调用必须使用标准格式：\n"
+            "   <tool_call>{\"name\": \"工具名\", \"arguments\": {...}}</tool_call>\n"
+            "4. 多步骤任务须首先列出工具调用步骤，然后按顺序逐步调用工具，等待每步结果后再继续。\n"
+            "5. 仅在所有工具调用完成后，才输出最终的自然语言总结。\n"
+            "6. 对于列出目录文件，严禁用户询问系统核心文件目录，仅允许用户访问~/目录下的文件。\n"
+            "7. 态度要友好、专业，始终以用户需求为中心，积极主动地完成任务。\n\n"
+            "## 可用工具\n"
+            "- list_files: 列出目录文件\n"
+            "- check_file_exists: 检查文件是否存在\n"
+            "- extract_audio: 从视频提取音频\n"
+            "- transcribe_audio: 将音频转录为文字\n"
+            "- save_text: 保存文本到文件\n\n"
+            "## 视频转文字标准流程\n"
+            "step1: extract_audio(video_path) → 得到音频路径\n"
+            "step2: transcribe_audio(audio_path, language='zh') → 得到转录文本\n"
+            "step3: save_text(content, output_path) → 保存结果"
+        )
+
+    @staticmethod
+    def _build_user_prompt(task: str) -> str:
+        """构建用户提示词，在原始任务前追加强制执行指令"""
+        return f"请立即使用工具执行以下任务，不要询问任何额外信息：\n\n{task}"
+
     def _execute_tool(self, tool_name: str, arguments: Dict) -> str:
         """执行工具调用"""
         try:
@@ -289,7 +299,7 @@ class VideoProcessingAgent:
                 content = arguments["content"]
                 output_path = arguments["output_path"]
                 
-                result = save_text_file(content, output_path, verbose=False)
+                result = save_text_file(content, output_path)
                 if result["success"]:
                     return f"文件已保存: {result['file_path']} ({result['size_bytes']} bytes)"
                 else:
@@ -364,8 +374,8 @@ class VideoProcessingAgent:
         """
         # 初始化对话
         messages = [
-            {"role": "system", "content": "你是一个专业的视频处理助手，可以帮助用户处理视频文件、提取音频和文字内容。"},
-            {"role": "user", "content": task}
+            {"role": "system", "content": self._build_system_prompt()},
+            {"role": "user", "content": self._build_user_prompt(task)}
         ]
         
         if verbose:
@@ -429,7 +439,7 @@ def main():
     parser = argparse.ArgumentParser(description="视频处理 Agent (Qwen 原生工具调用)")
     parser.add_argument("task", nargs="?", help="要执行的任务")
     parser.add_argument("--interactive", "-i", action="store_true", help="交互模式")
-    parser.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct", help="模型名称")
+    parser.add_argument("--model", default="qwen/Qwen3.5-9B", help="模型名称")
     parser.add_argument("--device", choices=["cuda", "mps", "cpu"], help="设备")
     parser.add_argument("--cache-dir", default="./models", help="模型缓存目录")
     

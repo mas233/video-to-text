@@ -14,7 +14,7 @@ def save_text_file(
     output_path: str,
     encoding: str = "utf-8",
     create_dirs: bool = True,
-    verbose: bool = True
+    verbose: bool = False
 ) -> Dict[str, Any]:
     """
     保存文本内容到文件
@@ -72,7 +72,7 @@ def save_json_file(
     indent: int = 2,
     ensure_ascii: bool = False,
     create_dirs: bool = True,
-    verbose: bool = True
+    verbose: bool = False
 ) -> Dict[str, Any]:
     """
     保存 JSON 数据到文件
