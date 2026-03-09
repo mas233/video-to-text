@@ -147,6 +147,24 @@ docker run --rm \
 - `--rm` - 容器退出后自动删除
 - `-it` - 交互模式
 
+### UI Docker 运行（Flask）
+
+```bash
+# 构建 UI 镜像
+docker build -f Dockerfile-ui -t video-summary-ui .
+
+# 运行 UI（关键：映射宿主机 /tmp/models）
+docker run --rm -p 5000:5000 \
+  -v /tmp/models:/tmp/models \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/output:/app/output \
+  video-summary-ui
+```
+
+说明：
+- `-v /tmp/models:/tmp/models`：模型下载与加载都使用宿主机缓存，不使用镜像内缓存。
+- `-v $(pwd)/data:/app/data` 与 `-v $(pwd)/output:/app/output`：上传文件与转录产物持久化到工作区。
+
 ## 🔍 故障排查
 
 ### 模型下载慢

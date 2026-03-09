@@ -4,7 +4,7 @@
 
 ## ✨ 特性
 
-- ✅ **开源模型**: 使用 Qwen/LLaMA 等开源 LLM，无需 API 费用
+- ✅ **开源模型**: 使用 DeepSeek-R1/Qwen3.5 等开源 LLM，无需 API 费用
 - ✅ **离线运行**: 模型下载后可完全离线使用
 - ✅ **文件系统访问**: 浏览和检查文件
 - ✅ **MCP 工具调用**: 调用视频处理工具
@@ -37,9 +37,17 @@ Agent 可以使用以下工具:
 
 | 模型 | 参数量 | 中文能力 | 推荐度 | 备注 |
 |------|--------|---------|--------|------|
-| **Qwen/Qwen2.5-7B-Instruct** | 7B | ⭐⭐⭐⭐⭐ | ✅ 强烈推荐 | 中文最佳，指令遵循优秀 |
-| Qwen/Qwen2-7B-Instruct | 7B | ⭐⭐⭐⭐ | ✅ 推荐 | 通义千问 2 代 |
-| meta-llama/Llama-3.1-8B-Instruct | 8B | ⭐⭐⭐ | 可选 | 英文更佳 |
+| **deepseek-ai/DeepSeek-R1-0528-Qwen3-8B** | 8B | ⭐⭐⭐⭐⭐ | ✅ 强烈推荐 | 推理能力极强，基于 Qwen3-8B 蒸馏 |
+| Qwen/Qwen3.5-9B | 9.65B | ⭐⭐⭐⭐⭐ | ✅ 推荐 | 多模态，支持 262K 上下文 |
+| Qwen/Qwen3.5-27B | 27.78B | ⭐⭐⭐⭐⭐ | 可选（需较多显存）| 多模态旗舰，综合能力最强 |
+
+### 模型下载链接
+
+| 模型 | ModelScope | HuggingFace |
+|------|-----------|-------------|
+| deepseek-ai/DeepSeek-R1-0528-Qwen3-8B | [ModelScope](https://www.modelscope.cn/models/deepseek-ai/DeepSeek-R1-0528-Qwen3-8B) | [HuggingFace](https://huggingface.co/deepseek-ai/DeepSeek-R1-0528-Qwen3-8B) |
+| Qwen/Qwen3.5-9B | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3.5-9B) | [HuggingFace](https://huggingface.co/Qwen/Qwen3.5-9B) |
+| Qwen/Qwen3.5-27B | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3.5-27B) | [HuggingFace](https://huggingface.co/Qwen/Qwen3.5-27B) |
 
 ## 使用方法
 
@@ -66,7 +74,7 @@ pip install -r requirements.txt
 #### 1. 交互模式（推荐）
 
 ```bash
-# 使用默认模型 (Qwen2.5-7B-Instruct)
+# 使用默认模型 (DeepSeek-R1-0528-Qwen3-8B)
 python agent/video_agent.py --interactive
 
 # 使用 8-bit 量化（节省显存）
@@ -75,17 +83,20 @@ python agent/video_agent.py --interactive --8bit
 # 使用 4-bit 量化（更省显存）
 python agent/video_agent.py --interactive --4bit
 
-# 指定模型
-python agent/video_agent.py --interactive --model Qwen/Qwen2-7B-Instruct
+# 指定 Qwen3.5-9B
+python agent/video_agent.py --interactive --model Qwen/Qwen3.5-9B
+
+# 指定 Qwen3.5-27B（需要较多显存）
+python agent/video_agent.py --interactive --model Qwen/Qwen3.5-27B
 ```
 
 示例对话:
 ```
 正在初始化 Agent (开源模型版本)...
-模型: Qwen/Qwen2.5-7B-Instruct
+模型: deepseek-ai/DeepSeek-R1-0528-Qwen3-8B
 设备: mps
 缓存目录: ./models
-正在加载模型: Qwen/Qwen2.5-7B-Instruct
+正在加载模型: deepseek-ai/DeepSeek-R1-0528-Qwen3-8B
 ✓ 模型加载完成
 Agent 初始化完成!
 
@@ -130,12 +141,12 @@ python agent/video_agent.py --help
 ```python
 from agent.video_agent import VideoProcessingAgent
 
-# 创建 Agent (默认 Qwen2.5-7B)
+# 创建 Agent (默认 DeepSeek-R1-0528-Qwen3-8B)
 agent = VideoProcessingAgent()
 
 # 或者自定义配置
 agent = VideoProcessingAgent(
-    model_name="Qwen/Qwen2.5-7B-Instruct",
+    model_name="Qwen/Qwen3.5-9B",
     model_cache_dir="./models",
     temperature=0.1,
     max_length=2048,
@@ -165,32 +176,41 @@ python agent/video_agent.py --interactive
 
 # 输出示例:
 正在初始化 Agent (开源模型版本)...
-模型: Qwen/Qwen2.5-7B-Instruct
+模型: deepseek-ai/DeepSeek-R1-0528-Qwen3-8B
 设备: cuda
 缓存目录: ./models
-正在加载模型: Qwen/Qwen2.5-7B-Instruct
+正在加载模型: deepseek-ai/DeepSeek-R1-0528-Qwen3-8B
 Downloading (…)lve/main/config.json: 100%|████████| 615/615 [00:00<00:00, 38.6kB/s]
-Downloading pytorch_model.bin: 100%|████████| 14.5G/14.5G [15:23<00:00, 15.7MB/s]
+Downloading pytorch_model.bin: 100%|████████| 16.4G/16.4G [16:24<00:00, 16.6MB/s]
 Downloading (…)okenizer_config.json: 100%|████████| 354/354 [00:00<00:00, 28.1kB/s]
 ✓ 模型加载完成
 ```
 
 ### 预下载模型（推荐）
 
+通过 ModelScope 下载（国内推荐）:
 ```bash
-# 使用 core/download_model.py 预先下载
-python core/download_model.py \
-    --model Qwen/Qwen2.5-7B-Instruct \
-    --cache-dir ./models
+# 使用 modelscope 命令行工具预先下载
+modelscope download --model deepseek-ai/DeepSeek-R1-0528-Qwen3-8B --local_dir ./models/DeepSeek-R1-0528-Qwen3-8B
+modelscope download --model Qwen/Qwen3.5-9B --local_dir ./models/Qwen3.5-9B
+modelscope download --model Qwen/Qwen3.5-27B --local_dir ./models/Qwen3.5-27B
+```
+
+通过 HuggingFace 下载（海外）:
+```bash
+# 需要先安装 huggingface_hub
+pip install huggingface_hub
+huggingface-cli download deepseek-ai/DeepSeek-R1-0528-Qwen3-8B --local-dir ./models/DeepSeek-R1-0528-Qwen3-8B
+huggingface-cli download Qwen/Qwen3.5-9B --local-dir ./models/Qwen3.5-9B
 ```
 
 ### 模型文件大小
 
 | 模型 | 大小 | 下载时间 (估算) |
 |------|------|----------------|
-| Qwen/Qwen2.5-7B-Instruct | ~14.5 GB | 100Mbps: ~20分钟 |
-| Qwen/Qwen2-7B-Instruct | ~14.2 GB | 100Mbps: ~19分钟 |
-| Llama-3.1-8B-Instruct | ~16.0 GB | 100Mbps: ~22分钟 |
+| deepseek-ai/DeepSeek-R1-0528-Qwen3-8B | ~16.4 GB | 100Mbps: ~22分钟 |
+| Qwen/Qwen3.5-9B | ~19.3 GB | 100Mbps: ~26分钟 |
+| Qwen/Qwen3.5-27B | ~55.6 GB | 100Mbps: ~75分钟 |
 
 **提示**: 模型只需下载一次，后续使用会从本地缓存加载（~30秒）。
 
@@ -273,11 +293,14 @@ agent/logs/
 ### 模型选择
 
 ```bash
-# 使用 GPT-4 (推荐，推理能力强)
-python agent/video_agent.py --model gpt-4
+# 使用 DeepSeek-R1-0528-Qwen3-8B (默认，推理能力强)
+python agent/video_agent.py --model deepseek-ai/DeepSeek-R1-0528-Qwen3-8B
 
-# 使用 GPT-3.5 (更快，成本低)
-python agent/video_agent.py --model gpt-3.5-turbo
+# 使用 Qwen3.5-9B (多模态，性能均衡)
+python agent/video_agent.py --model Qwen/Qwen3.5-9B
+
+# 使用 Qwen3.5-27B (旗舰，需要较大显存)
+python agent/video_agent.py --model Qwen/Qwen3.5-27B
 ```
 
 ### 温度参数
@@ -299,17 +322,28 @@ agent = VideoProcessingAgent(
 
 ## 故障排查
 
-### Q: "OPENAI_API_KEY not found"
-**A**: 设置环境变量
+### Q: 模型下载太慢
+**A**: 国内用户优先使用 ModelScope 下载，速度更快:
 ```bash
-export OPENAI_API_KEY='sk-your-key-here'
+pip install modelscope
+modelscope download --model deepseek-ai/DeepSeek-R1-0528-Qwen3-8B --local_dir ./models/DeepSeek-R1-0528-Qwen3-8B
 ```
 
 ### Q: Agent 陷入循环
-**A**: 设置更低的温度 (temperature=0) 或使用更强的模型 (gpt-4)
+**A**: 设置更低的温度 (temperature=0) 或切换为推理能力更强的模型 (Qwen3.5-27B)
 
 ### Q: 工具调用失败
 **A**: 检查 `agent/logs/` 目录下的错误日志
+
+### Q: 显存不足 (OOM)
+**A**: 使用量化参数或选择更小的模型:
+```bash
+# 使用 4-bit 量化
+python agent/video_agent.py --4bit --model deepseek-ai/DeepSeek-R1-0528-Qwen3-8B
+
+# 换用更小的模型
+python agent/video_agent.py --model deepseek-ai/DeepSeek-R1-0528-Qwen3-8B
+```
 
 ## 扩展
 
@@ -334,14 +368,14 @@ Tool(
 
 ## 限制
 
-- 需要 OpenAI API Key (付费)
-- 依赖网络连接（调用 LLM）
-- 推理速度受模型限制
+- 首次运行需要下载大型模型文件（8~56 GB）
+- 推理速度受硬件和模型大小限制
+- Qwen3.5-27B 需要 48GB+ 显存全精度运行
 
 ## 未来改进
 
-- [ ] 支持本地 LLM (LLaMA, Qwen)
 - [ ] 多轮对话记忆持久化
 - [ ] 工具调用缓存
 - [ ] 并行任务执行
 - [ ] Web UI 界面
+- [ ] 支持更多新一代开源模型

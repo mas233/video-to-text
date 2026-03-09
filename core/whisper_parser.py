@@ -59,7 +59,7 @@ def select_model_by_resources():
     total_memory = max(available_memory, gpu_memory)
     
     if total_memory >= 8:
-        return "openai/whisper-large-v3", "large-v3"
+        return "openai/whisper-large-v3-turbo", "large-v3-turbo"
     elif total_memory >= 6:
         return "openai/whisper-large-v3-turbo", "large-v3-turbo"
     elif total_memory >= 4:
@@ -135,6 +135,7 @@ def merge_word_chunks_to_sentences(chunks: List[Dict], max_sentences: int = 2, m
        - 达到 max_sentences 个句子结束标点
        - 累积文本长度超过 max_chars 字符
     2. 如果一个 chunk 本身就很长（>max_chars），直接作为独立段落
+    3. 特殊处理：数字、小数点、百分号等不能被切分
     
     Args:
         chunks: 词级别的 chunks（每个包含 timestamp 和 text）
@@ -149,6 +150,8 @@ def merge_word_chunks_to_sentences(chunks: List[Dict], max_sentences: int = 2, m
     
     # 句子结束标点（中英文）
     sentence_end_pattern = re.compile(r'[。！？\.!\?]')
+    # 数字相关字符（数字、小数点、逗号、百分号等）
+    numeric_pattern = re.compile(r'^[\d\.\,\%\+\-]+$')
     
     merged_chunks = []
     current_text = ""
@@ -195,10 +198,21 @@ def merge_word_chunks_to_sentences(chunks: List[Dict], max_sentences: int = 2, m
             sentence_matches = sentence_end_pattern.findall(text)
             sentence_count += len(sentence_matches)
             
+            # 检查下一个 chunk 是否是数字相关（小数点、百分号等）
+            is_next_numeric = False
+            if i + 1 < len(chunks):
+                next_text = chunks[i + 1]["text"].strip()
+                is_next_numeric = bool(numeric_pattern.match(next_text))
+            
+            # 检查当前 chunk 是否是数字相关
+            is_current_numeric = bool(numeric_pattern.match(text.strip()))
+            
             # 检查是否需要切分（达到句子数或字符数限制）
+            # 但如果下一个是数字相关，或当前是数字相关，不切分
             should_split = (
-                sentence_count >= max_sentences or 
-                len(current_text) >= max_chars
+                (sentence_count >= max_sentences or len(current_text) >= max_chars)
+                and not is_next_numeric
+                and not is_current_numeric
             )
             
             if should_split:
@@ -284,7 +298,7 @@ def load_model():
         _model.to(device)
         _processor = AutoProcessor.from_pretrained(model_id, cache_dir=cache_dir_abs)
     
-    # 创建 pipeline
+    # 创建 pipeline（配置 tokenizer 输出标点）
     _pipe = pipeline(
         "automatic-speech-recognition",
         model=_model,
@@ -292,6 +306,7 @@ def load_model():
         feature_extractor=_processor.feature_extractor,
         dtype=torch_dtype,
         device=device,
+        model_kwargs={"use_cache": True},
     )
 
 
@@ -363,20 +378,31 @@ def transcribe_audio(
     if not audio_path.exists():
         raise FileNotFoundError(f"音频文件不存在: {audio_path}")
     
-    # 执行转录（启用词级别时间戳）
+    # 执行转录（使用句子级别时间戳以保留标点符号）
+    # 注意：词级别 (return_timestamps="word") 不会输出标点
     result = _pipe(
         str(audio_path),
-        generate_kwargs={"language": language, "task": "transcribe"},
-        return_timestamps="word",
+        generate_kwargs={
+            "language": language,
+            "task": "transcribe",
+        },
+        return_timestamps=True,  # 句子级别时间戳，包含标点
         chunk_length_s=30,
     )
     
-    # 将词级别的分段合并为句子级别
-    sentence_chunks = merge_word_chunks_to_sentences(
-        result.get("chunks", []), 
-        max_sentences=2,
-        max_chars=80
-    )
+    # 处理时间戳分段
+    # 句子级别的 chunks 已包含标点，只需按字符数限制重新切分
+    raw_chunks = result.get("chunks", [])
+    if raw_chunks:
+        # 如果有 chunks，进行智能合并（保持数字完整性）
+        sentence_chunks = merge_word_chunks_to_sentences(
+            raw_chunks, 
+            max_sentences=2,
+            max_chars=80
+        )
+    else:
+        # 没有 chunks，使用完整文本
+        sentence_chunks = []
     
     # 构建结果字典
     transcription_result = _build_transcription_result(result, audio_path, language, sentence_chunks)
